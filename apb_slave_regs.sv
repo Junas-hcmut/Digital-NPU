@@ -1,18 +1,5 @@
 `timescale 1ns/1ps
-// ============================================================================
-// apb_slave_regs.sv
-//
-// Khoi giao tiep BUS cho NPU - chon APB4 (khong phai AXI4) vi day la BUS
-// DIEU KHIEN (control-plane): host (vd ARM Cortex-A9 HPS tren DE10-Standard,
-// qua cau Avalon<->APB, hoac 1 testbench dong vai host) chi can ghi vai
-// thanh ghi cau hinh + doc trang thai/ket qua - KHONG can burst, KHONG can
-// nhieu outstanding transaction, KHONG can pipeline nhu AXI4 (von danh cho
-// bus DU LIEU bang thong cao). APB don gian hon nhieu de tu ve dung (handshake
-// 2 pha SETUP/ACCESS, khong co wait-state phuc tap), phu hop muc do "trung
-// binh" cua do an va voi vai tro FALLBACK (uu tien it rui ro thiet ke hon la
-// toi uu bang thong).
-//
-// Giao thuc APB4 chuan (xem ARM IHI 0024):
+
 //   - Transaction gom 2 chu ky: SETUP (PSEL=1,PENABLE=0) roi ACCESS
 //     (PSEL=1,PENABLE=1). Slave nay tra loi ZERO-WAIT-STATE (PREADY=1'b1
 //     luon luon) nen ACCESS luon dung dung 1 chu ky - don gian hoa toi da.
@@ -45,10 +32,7 @@
 //                       host doc kip real-time luc dang chay). Chi so:
 //                       idx = out_pe_index*num_array + array_idx
 //                       byte_addr = 0x40 + idx*4
-//                       -> host nen doi done=1 roi doc tuan tu toan bo
 //                       num_pe*num_array gia tri sau khi FSM chay xong.
-// ============================================================================
-
 module apb_slave_regs #(
 	parameter int data_width   = 8,
 	parameter int acc_width    = 32,
@@ -63,8 +47,7 @@ module apb_slave_regs #(
 )(
 	input logic clk,
 	input logic rst_n,
-
-	// ---- APB4 slave ----
+	//  APB4 slave 
 	input  logic                    psel,
 	input  logic                    penable,
 	input  logic                    pwrite,
@@ -74,7 +57,7 @@ module apb_slave_regs #(
 	output logic [31:0]             prdata,
 	output logic                    pslverr,
 
-	// ---- noi sang npu_ctrl_top ----
+	//  noi sang npu_ctrl_top 
 	output logic                  start,
 	input  logic                  busy,
 	input  logic                  done,
@@ -100,7 +83,7 @@ module apb_slave_regs #(
 	input logic [cnt_width-1:0]      out_pe_index
 );
 
-	// ---- dia chi thanh ghi (word index = byte_addr >> 2) ----
+	//  dia chi thanh ghi (word index = byte_addr >> 2) 
 	localparam int A_CTRL      = 0;
 	localparam int A_STATUS    = 1;
 	localparam int A_RED_LEN   = 2;
@@ -121,11 +104,11 @@ module apb_slave_regs #(
 	assign apb_write = psel && penable && pwrite;
 	assign apb_read  = psel && penable && !pwrite;
 
-	// Slave khong wait-state, khong bao loi
+	// Slave khong wait-state
 	assign pready  = 1'b1;
 	assign pslverr = 1'b0;
 
-	// ---- thanh ghi cau hinh ----
+	//  thanh ghi cau hinh 
 	logic                  precision_r;
 	logic [cnt_width-1:0]  red_len_r;
 	logic                  relu_bypass_r, requant_bypass_r;
