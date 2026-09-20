@@ -1,5 +1,4 @@
 `timescale 1ns/1ps
-
 module requant #(
 	parameter int acc_width = 32,
 	parameter int scale_width = 16,
@@ -22,35 +21,44 @@ output logic valid_out
 );
 
 logic signed [acc_width:0] sub_val;
-assign sub_val = signed'(data_in) - signed'(cfg_offset);
+assign sub_val = $signed(data_in) - $signed(cfg_offset);
 
 localparam int prod_width = acc_width + 1 + scale_width;
 logic signed [prod_width-1:0] prod_val;
-assign pro_val = sub_val * signed'(cfg_scale);
+
+assign prod_val = sub_val * $signed(cfg_scale);
 
 logic signed [prod_width-1:0] shifted_val;
 assign shifted_val = prod_val >>> cfg_shift;
 
-localparam signed [prod_width-1:0] out_max = (1 <<< (out_width-1));
+
+localparam signed [prod_width-1:0] out_max =  (1 <<< (out_width-1)) - 1;
+
+localparam signed [prod_width-1:0] out_min = -(1 <<< (out_width-1));
+
+
+logic signed [prod_width-1:0] clamped_val;
+
+always_comb begin
+	if (shifted_val > out_max)
+		clamped_val = out_max;
+	else if (shifted_val < out_min)
+		clamped_val = out_min;
+	else
+		clamped_val = shifted_val;
+end
 
 logic signed [out_width-1:0] sat_val;
-always_comb besgin 
-	if (shifted_val > out_max)
-		sat_val = out_max[out_width-1:0];
-	else if (shifted_val < out_min)
-		sat_val = out_min[out_width-1:0];
-	else 
-		sat_val = shifted_val[out_width-1:0];
-end 
+assign sat_val = clamped_val[out_width-1:0];
 
 logic signed [out_width-1:0] result_val;
 assign result_val = cfg_bypass ? data_in[out_width-1:0] : sat_val;
 
-always_ff @(posedge clk or negedge rst_n) begin 
-	if (!rst_n) begin 
+always_ff @(posedge clk or negedge rst_n) begin
+	if (!rst_n) begin
 		data_out <= '0;
 		valid_out <= 1'b0;
-	end else if (en) begin 
+	end else if (en) begin
 		data_out <= result_val;
 		valid_out <= 1'b1;
 	end else begin
@@ -58,5 +66,4 @@ always_ff @(posedge clk or negedge rst_n) begin
 	end
 end
 
-endmodule 
-
+endmodule
