@@ -1,17 +1,5 @@
 `timescale 1ns/1ps
-// ============================================================================
-// npu_apb_top.sv
-//
-// Wrapper noi apb_slave_regs.sv (giao dien bus, phia host) voi npu_ctrl_top
-// (dieu khien + datapath, phia NPU). Day la module TREN CUNG cung (top-level
-// cua toan he thong NPU) - neu ghep vao Platform Designer/Qsys tren
-// DE10-Standard, day la module se duoc bao boc them boi cau Avalon-MM<->APB
-// (hoac dung truc tiep neu Qsys ho tro APB component).
-//
-// Khong co logic dieu khien moi o day - CHI la day noi (structural), de giu
-// npu_ctrl_top nguyen ven (da duoc verify) va apb_slave_regs doc lap, de test
-// rieng tung khoi truoc khi ghep.
-// ============================================================================
+
 
 module npu_apb_top #(
 	parameter int data_width  = 8,
@@ -22,25 +10,24 @@ module npu_apb_top #(
 	parameter int act_depth   = 1024,
 	parameter int wgt_depth   = 4096,
 	parameter int cnt_width   = 16,
-	parameter int paddr_width = 12,
-
-	localparam int wgt_addr_w = $clog2(wgt_depth)
+	parameter int paddr_width = 12
 )(
 	input logic clk,
 	input logic rst_n,
 
-	// ---- APB4 slave (phia host) ----
-	input  logic                   psel,
-	input  logic                   penable,
-	input  logic                   pwrite,
-	input  logic [paddr_width-1:0] paddr,
-	input  logic [31:0]            pwdata,
-	output logic                   pready,
-	output logic [31:0]            prdata,
-	output logic                   pslverr
+
+	input  logic                   PSEL,
+	input  logic                   PENABLE,
+	input  logic                   PWRITE,
+	input  logic [paddr_width-1:0] PADDR,
+	input  logic [31:0]            PWDATA,
+	output logic                   PREADY,
+	output logic [31:0]            PRDATA,
+	output logic                   PSLVERR
 );
 
-	// ---- day noi apb_slave_regs <-> npu_ctrl_top ----
+		localparam int wgt_addr_w = $clog2(wgt_depth);
+
 	logic                  start, busy, done;
 	logic [cnt_width-1:0]  cfg_reduction_len;
 	logic                  cfg_precision;
@@ -49,17 +36,17 @@ module npu_apb_top #(
 	logic [data_width-1:0] act_wr_data;
 	logic                  act_wr_ready;
 
-	logic                  cfg_wgt_wr_en   [num_array];
-	logic [wgt_addr_w-1:0] cfg_wgt_wr_addr [num_array];
-	logic [data_width-1:0] cfg_wgt_wr_data [num_array];
+		logic [num_array-1:0]                    cfg_wgt_wr_en;
+	logic [num_array-1:0][wgt_addr_w-1:0]    cfg_wgt_wr_addr;
+	logic [num_array-1:0][data_width-1:0]    cfg_wgt_wr_data;
 
 	logic                        cfg_relu_bypass, cfg_requant_bypass;
 	logic signed [acc_width-1:0] cfg_requant_offset;
 	logic signed [15:0]          cfg_requant_scale;
 	logic [5:0]                  cfg_requant_shift;
 
-	logic                        out_valid [num_array];
-	logic signed [out_width-1:0] out_data  [num_array];
+	logic [num_array-1:0]                        out_valid;
+	logic signed [num_array-1:0][out_width-1:0]  out_data;
 	logic [cnt_width-1:0]        out_pe_index;
 
 	apb_slave_regs #(
@@ -68,9 +55,9 @@ module npu_apb_top #(
 		.wgt_addr_w(wgt_addr_w), .paddr_width(paddr_width)
 	) u_apb (
 		.clk(clk), .rst_n(rst_n),
-		.psel(psel), .penable(penable), .pwrite(pwrite),
-		.paddr(paddr), .pwdata(pwdata),
-		.pready(pready), .prdata(prdata), .pslverr(pslverr),
+				.psel(PSEL), .penable(PENABLE), .pwrite(PWRITE),
+		.paddr(PADDR), .pwdata(PWDATA),
+		.pready(PREADY), .prdata(PRDATA), .pslverr(PSLVERR),
 
 		.start(start), .busy(busy), .done(done),
 		.cfg_reduction_len(cfg_reduction_len), .cfg_precision(cfg_precision),
