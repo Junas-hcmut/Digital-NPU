@@ -9,7 +9,7 @@ module act_buffer #(
 //Ghi
 		input logic wr_en,
 		input logic [data_width-1:0] wr_data,
-		output logic wr_ready
+		output logic wr_ready,
 //Doc
                 input logic rd_en,
 		input logic [addr_width-1:0] rd_addr,
