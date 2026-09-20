@@ -1,39 +1,4 @@
 `timescale 1ns/1ps
-// ============================================================================
-// npu_ctrl_top.sv (v2 - viet lai theo dung kien truc mac_system that cua ban)
-//
-// Khac voi ban v1 truoc (gia dinh sai: act_in la 1 "cua so" NUM_PE gia tri
-// nap 1 lan roi tinh 1 phat), ban nay dung dung cach mac_chain hoat dong:
-//   - act_in LA 1 GIA TRI SCALAR, broadcast cho ca num_pe PE trong 1 array,
-//     MOI ARRAY co the nhan cung 1 gia tri act_in (cung 1 chieu reduction).
-//   - Voi MOI buoc reduction t (t=0..reduction_len-1):
-//       1. Shift num_pe trong so MOI (cho buoc t) vao tung array qua
-//          weight_serial_in/shift_en (dung song song weight_mem_loader
-//          rieng cho tung array - vi moi array giu 1 nhom output-channel
-//          khac nhau, can trong so khac nhau).
-//       2. capture_en 1 xung -> chot trong so vao active weight_reg cua
-//          tat ca PE trong array do.
-//       3. Doc 1 gia tri activation tu act_buffer, dua vao act_in (broadcast
-//          cho MOI array), valid_in=1 1 xung -> moi PE tich luy act*weight
-//          vao chinh acc_reg cua no (KHONG can cong don "tile" nhu ban v1,
-//          vi accumulator trong mac_unit da tu cong don qua tung chu ky).
-//   - Sau khi het reduction_len buoc: output_load_en chot toan bo acc_out
-//     cua moi array vao thanh ghi dich, roi output_shift_en lien tuc num_pe
-//     lan de doc tuan tu tung gia tri result_serial_out (moi array 1 gia
-//     tri/chu ky, song song num_array array) -> qua relu (lanes=num_array)
-//     -> qua requant (1 instance rieng cho moi array) -> xuat ra ngoai.
-//
-// ******************************************************************
-// CANH BAO VE TIMING CAN TU KIEM TRA LAI BANG SIMULATOR THAT:
-//   O trang thai S_OUT_SHIFT, minh doc result_serial_out VA pulse
-//   output_shift_en TRONG CUNG 1 chu ky (doc gia tri hien tai, dong thoi
-//   yeu cau dich sang gia tri ke tiep cho vong sau). Cach nay dung VE MAT
-//   LOGIC (da kiem tra bang mo hinh dieu khien Python), nhung minh KHONG co
-//   simulator SystemVerilog that (iverilog/Verilator/Questa) trong moi
-//   truong nay de chay dung waveform xac nhan do tre 1 chu ky cua
-//   out_shift_reg trong mac_chain khop chinh xac voi gia dinh nay. Ban NEN
-//   tu mo phong lai doan nay truoc khi tin tuong hoan toan.
-// ============================================================================
 
 module npu_ctrl_top #(
 	parameter int data_width  = 8,
@@ -42,49 +7,46 @@ module npu_ctrl_top #(
 	parameter int num_pe      = 16,
 	parameter int num_array   = 4,
 	parameter int act_depth   = 1024,
-	parameter int wgt_depth   = 4096,   // dung luong weight_mem CUA MOI array
+	parameter int wgt_depth   = 4096,   
 	parameter int cnt_width   = 16,
 
-	localparam int act_addr_w = $clog2(act_depth),
-	localparam int wgt_addr_w = $clog2(wgt_depth),
-	localparam int pe_cnt_w   = $clog2(num_pe+1)
+		parameter int act_addr_w = $clog2(act_depth),
+	parameter int wgt_addr_w = $clog2(wgt_depth),
+	parameter int pe_cnt_w   = $clog2(num_pe+1)
 )(
 	input logic clk,
 	input logic rst_n,
 
-	// ---- Dieu khien tong the ----
+	
 	input  logic              start,
 	output logic              busy,
 	output logic              done,
-	input  logic [cnt_width-1:0] cfg_reduction_len, // so buoc reduction (chieu dai vector nhan-cong)
-	input  logic              cfg_precision,     // 0=INT8, 1=INT4 (runtime) - noi thang xuong mac_system
+	input  logic [cnt_width-1:0] cfg_reduction_len,
+	input  logic              cfg_precision,    
 
-	// ---- Nap du lieu tho vao act_buffer ----
+
 	input  logic                  act_wr_en,
 	input  logic [data_width-1:0] act_wr_data,
 	output logic                  act_wr_ready,
 
-	// ---- Nap trong so cho TUNG array (1 lan luc cau hinh model) ----
-	input  logic                    cfg_wgt_wr_en    [num_array],
-	input  logic [wgt_addr_w-1:0]   cfg_wgt_wr_addr  [num_array],
-	input  logic [data_width-1:0]   cfg_wgt_wr_data  [num_array],
+		input  logic [num_array-1:0]                    cfg_wgt_wr_en,
+	input  logic [num_array-1:0][wgt_addr_w-1:0]     cfg_wgt_wr_addr,
+	input  logic [num_array-1:0][data_width-1:0]     cfg_wgt_wr_data,
 
-	// ---- Cau hinh ReLU / requant (dung chung cho ca lop) ----
+
 	input  logic                     cfg_relu_bypass,
 	input  logic                     cfg_requant_bypass,
 	input  logic signed [acc_width-1:0] cfg_requant_offset,
 	input  logic signed [15:0]          cfg_requant_scale,
 	input  logic [5:0]                  cfg_requant_shift,
 
-	// ---- Ket qua cuoi: moi chu ky xuat toi da num_array gia tri song song ----
-	output logic                      out_valid   [num_array],
-	output logic signed [out_width-1:0] out_data  [num_array],
-	output logic [cnt_width-1:0]      out_pe_index          // pe_cnt hien tai (0..num_pe-1); kenh output that = a*num_pe? tuy quy uoc cua ban
+	
+	output logic [num_array-1:0]                        out_valid,
+	output logic signed [num_array-1:0][out_width-1:0]   out_data,
+	output logic [cnt_width-1:0]      out_pe_index          
 );
 
-	// ------------------------------------------------------------------
-	// act_buffer
-	// ------------------------------------------------------------------
+	
 	logic                 act_rd_en;
 	logic [act_addr_w-1:0] act_rd_addr;
 	logic [data_width-1:0] act_rd_data;
@@ -102,47 +64,33 @@ module npu_ctrl_top #(
 		.occupancy(act_occ), .full(act_full), .empty(act_empty)
 	);
 
-	// ------------------------------------------------------------------
-	// weight_mem_loader rieng cho TUNG array + tin hieu noi sang mac_system
-	// ------------------------------------------------------------------
+	
 	logic                  wload_start   [num_array];
 	logic [wgt_addr_w-1:0]  wload_base    [num_array];
 	logic                  wload_busy    [num_array];
 	logic                  wload_done    [num_array];
 	logic                  wload_shift_en[num_array];
 	logic [data_width-1:0] wload_shift_d [num_array];
-	logic [data_width-1:0] wload_pe_w    [num_array][num_pe]; // KHONG dung toi (xem ghi chu duoi)
+	logic [data_width-1:0] wload_pe_w    [num_array][num_pe]; 
 
 	generate
 		genvar ga;
 		for (ga = 0; ga < num_array; ga++) begin : g_wload
-			weight_mem_loader #(
-				.weight(data_width), .num_pe(num_pe), .total_weight(wgt_depth)
+			
+			weight_mem_load #(
+				.weight_w(data_width), .num_pe(num_pe), .total_weight(wgt_depth)
 			) u_wload (
 				.clk(clk), .rst_n(rst_n),
 				.cfg_wr_en(cfg_wgt_wr_en[ga]), .cfg_wr_addr(cfg_wgt_wr_addr[ga]), .cfg_wr_data(cfg_wgt_wr_data[ga]),
 				.load_tile_start(wload_start[ga]), .tile_base_addr(wload_base[ga]),
 				.load_tile_busy(wload_busy[ga]), .load_tile_done(wload_done[ga]),
 				.pe_shift_en(wload_shift_en[ga]), .pe_shift_data(wload_shift_d[ga]),
-				.pe_weight(wload_pe_w[ga])
-				// GHI CHU: pe_weight[]/chain[] noi bo cua weight_mem_loader KHONG
-				// duoc dung o day - mac_chain co chain_link RIENG cua no de
-				// shift+capture that su. Minh chi lay dung luong pe_shift_en/
-				// pe_shift_data (dong serial) noi thang vao shift_en/weight_
-				// serial_in cua mac_system. Phan pe_weight[] o day la phan
-				// cung du thua, co the cat bo sau de tiet kiem dien tich.
+								.pe_weight()
 			);
 		end
 	endgenerate
 
-	// ------------------------------------------------------------------
-	// mac_system that (fixed) - instantiate truc tiep, khong con la stub
-	// ------------------------------------------------------------------
-	// FIX (phat hien qua kiem tra elaboration bang slang): mac_system khai
-	// bao weight_serial_in/out la "signed", 2 duong day noi o day truoc do
-	// lai la unsigned -> loi that su khi elaborate (khong tu chuyen doi
-	// ngam giua mang packed signed/unsigned). Them "signed" cho khop.
-	logic signed [data_width-1:0] mac_wgt_serial_in [num_array];
+		logic signed [data_width-1:0] mac_wgt_serial_in [num_array];
 	logic signed [data_width-1:0] mac_wgt_serial_out[num_array];
 	logic                  mac_shift_en   [num_array];
 	logic                  mac_capture_en [num_array];
@@ -152,7 +100,7 @@ module npu_ctrl_top #(
 	logic signed [acc_width-1:0]  mac_acc_out[num_array][num_pe];
 	logic                  mac_out_load_en [num_array];
 	logic                  mac_out_shift_en[num_array];
-	logic signed [acc_width-1:0] mac_result_serial [num_array];
+		logic signed [num_array-1:0][acc_width-1:0] mac_result_serial;
 
 	generate
 		genvar gb;
@@ -174,12 +122,11 @@ module npu_ctrl_top #(
 		.result_serial_out(mac_result_serial)
 	);
 
-	// ------------------------------------------------------------------
-	// ReLU: xu ly num_array gia tri song song moi chu ky (1 lane/array)
-	// ------------------------------------------------------------------
+	
 	logic                          relu_en;
-	logic signed [acc_width-1:0]   relu_in  [num_array];
-	logic signed [acc_width-1:0]   relu_out [num_array];
+	
+	logic signed [num_array-1:0][acc_width-1:0]   relu_in;
+	logic signed [num_array-1:0][acc_width-1:0]   relu_out;
 	logic                          relu_valid;
 
 	relu #(.data_width(acc_width), .lanes(num_array)) u_relu (
@@ -187,9 +134,7 @@ module npu_ctrl_top #(
 		.data_in(relu_in), .data_out(relu_out), .valid_out(relu_valid)
 	);
 
-	// ------------------------------------------------------------------
-	// Requant: 1 instance/array (moi instance xu ly dung 1 stream scalar)
-	// ------------------------------------------------------------------
+	
 	logic requant_en;
 	logic requant_valid_arr [num_array];
 
@@ -208,13 +153,7 @@ module npu_ctrl_top #(
 		end
 	endgenerate
 
-	// ------------------------------------------------------------------
-	// FSM chinh - da tach rieng ra npu_fsm.sv (logic ben trong GIU NGUYEN,
-	// chi doi cach to chuc thanh 1 module rieng). O day chi con phan
-	// "broadcast" tin hieu scalar tu FSM ra thanh mang [num_array] cho
-	// mac_system/weight_mem_loader, va noi cac tin hieu trang thai vao.
-	// ------------------------------------------------------------------
-	logic                   fsm_wload_start;
+		logic                   fsm_wload_start;
 	logic [wgt_addr_w-1:0]  fsm_wload_base;
 	logic                   fsm_mac_capture_en;
 	logic                   fsm_mac_acc_clear;
@@ -247,7 +186,7 @@ module npu_ctrl_top #(
 
 	assign act_rd_retire_cnt = 1'b1;
 
-	// ---- Broadcast tin hieu scalar tu FSM ra num_array duong day that ----
+
 	generate
 		genvar gd;
 		for (gd = 0; gd < num_array; gd++) begin : g_ctrl
@@ -256,7 +195,7 @@ module npu_ctrl_top #(
 			assign mac_capture_en[gd]  = fsm_mac_capture_en;
 			assign mac_acc_clear[gd]   = fsm_mac_acc_clear;
 			assign mac_valid_in[gd]    = fsm_mac_valid_in;
-			assign mac_act_in[gd]      = fsm_act_hold; // broadcast cung 1 gia tri cho moi array
+			assign mac_act_in[gd]      = fsm_act_hold; 
 			assign mac_out_load_en[gd] = fsm_mac_out_load_en;
 			assign mac_out_shift_en[gd]= fsm_mac_out_shift_en;
 		end
