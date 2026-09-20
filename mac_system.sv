@@ -1,4 +1,5 @@
-`timescale 1ns/ps
+`timescale 1ns/1ps
+
 module mac_system #(
 	parameter int data_width = 8,
 	parameter int acc_width = 32,
@@ -7,7 +8,8 @@ module mac_system #(
 	)(
 		input logic clk,
 		input logic rst_n,
-		input logic cfg_precision,
+
+		input logic cfg_precision, 
 
 		// nap trong so
 		input logic signed [data_width-1:0] weight_serial_in [num_array],
@@ -19,11 +21,11 @@ module mac_system #(
 		input logic acc_clear [num_array],
 		input logic valid_in [num_array],
 		input logic signed [data_width-1:0] act_in [num_array],
-		output logic signed [acc_width-1:0] acc_out [num_array][num_pe]
+		output logic signed [acc_width-1:0] acc_out [num_array][num_pe],
 
 		input logic output_load_en [num_array],
 		input logic output_shift_en [num_array],
-		output logic signed [acc_width-1:0] result_serial_out [num_array]
+		output logic signed [num_array-1:0][acc_width-1:0] result_serial_out
 		);
 
 genvar a;
@@ -36,21 +38,20 @@ for (a=0; a < num_array; a++) begin: gen_array
 		) u_array (
 			.clk(clk),
 			.rst_n(rst_n),
-			.cfg_precision(cfg_precision)
+			.cfg_precision(cfg_precision),
 			.weight_serial_in(weight_serial_in[a]),
 			.weight_serial_out(weight_serial_out[a]),
 			.shift_en(shift_en[a]),
 			.capture_en(capture_en[a]),
 			.acc_clear(acc_clear[a]),
+.valid_in(valid_in[a]),
 			.act_in(act_in[a]),
-			.valid_in(valid_in[a]),
-			.acc_out(acc_out[a]),
-                         
+			.acc_out(),
+
 			.output_load_en(output_load_en[a]),
 			.output_shift_en(output_shift_en[a]),
 			.result_serial_out(result_serial_out[a])
 			);
 	end
-endgenerate 
-endmodule 
-
+endgenerate
+endmodule
