@@ -24,9 +24,7 @@ as a fallback path when no larger NPU is available.
 - Ran a **12-class keyword-spotting** model (TensorFlow/Keras, quantized with
   TensorFlow Lite INT8) on the RTL at **90% accuracy**.
 - Hardware outputs are **bit-exact (100%)** against the software golden model.
-- The design was taken through gate-level synthesis, STA and place-and-route in the
-  Cadence flow.
-<!-- TODO: add synthesis numbers (technology, target clock, area, WNS/TNS, power) and P&R screenshots -->
+<!-- TODO: add synthesis / STA / place-and-route results (technology, clock, area, WNS/TNS, power) once the physical implementation is done -->
 
 ## Architecture
 
