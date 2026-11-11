@@ -8,7 +8,7 @@ input logic [W-1:0] bw_const,
 output logic [W-1:0] sum_out,
 output logic [W-1:0] c_out
 );
-//8 to 6
+// 8 partial products + Baugh-Wooley constant reduced to sum/carry (5 CSA levels)
 logic [W-1:0] s1, c1, s2, c2;
 CSA3to2 #(.W(W)) u_l1_0 (.ina(pp0), .inb(pp1), .incin(pp2), .sumout(s1), .coutt(c1));
 CSA3to2 #(.W(W)) u_l1_1 (.ina(pp3), .inb(pp4), .incin(pp5), .sumout(s2), .coutt(c2));

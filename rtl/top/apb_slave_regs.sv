@@ -49,7 +49,7 @@ module apb_slave_regs #(
 
 		localparam int array_sel_w = (num_array > 1) ? $clog2(num_array) : 1;
 
-	// ---- dia chi thanh ghi (word index = byte_addr >> 2) ----
+	// ---- Register map (word index = byte_addr >> 2) ----
 	localparam int A_CTRL      = 0;
 	localparam int A_STATUS    = 1;
 	localparam int A_RED_LEN   = 2;
@@ -74,7 +74,7 @@ module apb_slave_regs #(
 	assign pready  = 1'b1;
 	assign pslverr = 1'b0;
 
-	// ---- thanh ghi cau hinh ----
+	// ---- Configuration registers ----
 	logic                  precision_r;
 	logic [cnt_width-1:0]  red_len_r;
 	logic                  relu_bypass_r, requant_bypass_r;
@@ -94,10 +94,10 @@ module apb_slave_regs #(
 	assign cfg_requant_scale  = rq_scale_r;
 	assign cfg_requant_shift  = rq_shift_r;
 
-	// start: xung to hop dung 1 chu ky APB ACCESS khi ghi CTRL.bit0=1
+	// start: single-cycle pulse in the APB ACCESS phase when CTRL.bit0 is written as 1
 	assign start = apb_write && (word_idx == A_CTRL) && pwdata[0];
 
-	// act_wr_en / act_wr_data: xung to hop khi ghi ACT_PUSH
+	// act_wr_en / act_wr_data: single-cycle push when ACT_PUSH is written
 	assign act_wr_en   = apb_write && (word_idx == A_ACT_PUSH);
 	assign act_wr_data = pwdata[data_width-1:0];
 
@@ -117,7 +117,7 @@ module apb_slave_regs #(
 			relu_bypass_r    <= 1'b0;
 			requant_bypass_r <= 1'b0;
 			rq_offset_r      <= '0;
-			rq_scale_r       <= 16'sd1; // mac dinh scale=1 (khong doi gia tri) - an toan hon 0
+			rq_scale_r       <= 16'sd1; // default scale = 1 (identity), safer than 0
 			rq_shift_r       <= '0;
 			wgt_sel_r        <= '0;
 			wgt_addr_r       <= '0;
@@ -156,8 +156,8 @@ module apb_slave_regs #(
 
 	always_ff @(posedge clk or negedge rst_n) begin
 		if (!rst_n) begin
-			// khong can reset tung phan tu result_mem (chi la vung nho ket
-			// qua, khong anh huong logic dieu khien)
+			// result_mem is a plain result buffer and does not affect control
+			// logic, so its entries are intentionally not reset
 		end else begin
 			for (int gj = 0; gj < num_array; gj++) begin
 				if (out_valid[gj]) begin
@@ -167,17 +167,17 @@ module apb_slave_regs #(
 		end
 	end
 
-	// ---- doc thanh ghi ----
+	// ---- Register read ----
 	always_comb begin
 		prdata = 32'h0;
 		if (apb_read || (psel && !pwrite)) begin
 			if (word_idx >= A_RESULT_BASE && word_idx < A_RESULT_BASE + num_pe*num_array) begin
-				// sign-extend ket qua out_width-bit ra 32 bit
+				// sign-extend the out_width-bit result to 32 bits
 				prdata = {{(32-out_width){result_mem[word_idx - A_RESULT_BASE][out_width-1]}},
 				           result_mem[word_idx - A_RESULT_BASE]};
 			end else begin
 				unique case (word_idx)
-					A_CTRL:      prdata = {30'b0, precision_r, 1'b0}; // start doc luon ra 0
+					A_CTRL:      prdata = {30'b0, precision_r, 1'b0}; // start always reads back as 0
 					A_STATUS:    prdata = {30'b0, done_sticky_r, busy};
 					A_RED_LEN:   prdata = {{(32-cnt_width){1'b0}}, red_len_r};
 					A_BYPASS:    prdata = {30'b0, requant_bypass_r, relu_bypass_r};

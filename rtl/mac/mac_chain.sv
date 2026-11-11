@@ -1,5 +1,6 @@
 `timescale 1ns/1ps
-//     mac_unit.
+// One MAC array: a chain of num_pe mac_unit PEs with a shared weight
+// shift chain and an output shift register.
 module mac_chain #(
 	parameter int acc_width = 32,
 	parameter int data_width = 8,

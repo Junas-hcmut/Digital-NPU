@@ -6,11 +6,11 @@ module act_buffer #(
 	)(
 		input logic clk,
 		input logic rst_n,
-//Ghi
+// Write port
 		input logic wr_en,
 		input logic [data_width-1:0] wr_data,
 		output logic wr_ready,
-//Doc
+// Read port
                 input logic rd_en,
 		input logic [addr_width-1:0] rd_addr,
 		output logic [data_width-1:0] rd_data,

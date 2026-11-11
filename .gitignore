@@ -1,0 +1,27 @@
+# Cadence Xcelium / SimVision
+xcelium.d/
+INCA_libs/
+*.shm/
+.simvision/
+xrun.history
+xrun.key
+waves.shm/
+
+# Questa / ModelSim
+work/
+transcript
+*.wlf
+modelsim.ini
+
+# Synthesis / P&R run directories and logs
+fv/
+*.log
+*.cmd
+*.jou
+*.history
+
+# Waveforms and misc
+*.vcd
+*.fsdb
+__pycache__/
+.DS_Store

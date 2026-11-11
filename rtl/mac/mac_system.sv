@@ -11,13 +11,13 @@ module mac_system #(
 
 		input logic cfg_precision, 
 
-		// nap trong so
+		// Weight loading
 		input logic signed [data_width-1:0] weight_serial_in [num_array],
 		output logic signed [data_width-1:0] weight_serial_out [num_array],
 		input logic shift_en [num_array],
 		input logic capture_en [num_array],
 
-		//Tinh toan
+		// Compute
 		input logic acc_clear [num_array],
 		input logic valid_in [num_array],
 		input logic signed [data_width-1:0] act_in [num_array],

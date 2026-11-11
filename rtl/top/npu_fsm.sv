@@ -38,6 +38,9 @@ module npu_fsm #(
 	output logic [cnt_width-1:0] red_step,
 	output logic [pe_cnt_w-1:0]  out_pe_cnt
 );
+	// Base address of the current activation vector in act_buffer
+	logic [act_addr_w-1:0] act_base;
+
 	typedef enum logic [3:0] {
 		S_IDLE, S_SHIFT_W, S_WAIT_SHIFT_W, S_CAPTURE_W,
 		S_FETCH_ACT, S_WAIT_ACT, S_MAC_ACC,
@@ -107,7 +110,6 @@ module npu_fsm #(
 	assign relu_en    = (state == S_OUT_SHIFT);
 	assign requant_en = (state == S_WAIT_RELU) && relu_valid;
 
-	logic [act_addr_w-1:0] act_base;
 	always_ff @(posedge clk or negedge rst_n) begin
 		if (!rst_n) begin
 			red_step   <= '0;
